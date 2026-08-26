@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gradely - ระบบตรวจการบ้านและให้คำแนะนำอัจฉริยะ</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts (Sarabun & Prompt) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- PDF.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <!-- Mammoth.js CDN (for Word .docx files) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+
+    <!-- Tailwind Custom Configuration for Theme Colors -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Prompt', 'Sarabun', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#fdf2f8',
+                            100: '#fce7f3',
+                            200: '#fbcfe8',
+                            300: '#f9a8d4',
+                            400: '#f472b6',
+                            500: '#ec4899', // Main Pink
+                            600: '#db2777',
+                            700: '#be185d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #f9fafb;
+        }
+        /* Custom scrollbar for better styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #f472b6;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #ec4899;
+        }
+    </style>
+</head>
+<body class="font-sans text-slate-800 flex flex-col min-h-screen">
+
+    <!-- Header Navigation -->
+    <header class="bg-white border-b border-pink-100 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo (ดับเบิลคลิกตรงนี้เพื่อเปิดหน้าต่างเชื่อมต่อลับ) -->
+                <div class="flex items-center space-x-3 cursor-pointer select-none" ondblclick="toggleSettingsModal()" title="ดับเบิลคลิกเพื่อตั้งค่าระบบ">
+                    <div class="bg-brand-500 text-white p-2.5 rounded-2xl flex items-center justify-center shadow-md shadow-brand-200 hover:scale-105 transition-transform">
+                        <i class="fa-solid fa-graduation-cap text-xl"></i>
+                    </div>
+                    <div>
+                        <span class="text-2xl font-bold bg-gradient-to-r from-brand-600 to-pink-400 bg-clip-text text-transparent">Gradely</span>
+                        <span class="text-xs block text-slate-400 font-medium">AI Homework Assistant</span>
+                    </div>
+                </div>
+
+                <!-- ป้ายแสดงสถานะการเชื่อมต่อ AI อัจฉริยะ (สามารถคลิกตรวจวิเคราะห์ข้อผิดพลาดได้) -->
+                <div id="statusBadge" class="flex items-center space-x-2 bg-slate-100 text-slate-500 px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium transition-colors duration-300">
+                    <span id="statusIndicator" class="w-2 h-2 rounded-full bg-slate-400"></span>
+                    <span id="statusText">กำลังโหลดสถานะ AI...</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- Welcome Banner -->
+        <div class="bg-gradient-to-r from-brand-50 via-pink-50/30 to-transparent border border-brand-100/40 rounded-3xl p-6 sm:p-8 mb-8 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div class="space-y-2 text-center md:text-left">
+                <span class="bg-brand-100 text-brand-700 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider">Stateless & Multi-format</span>
+                <h1 class="text-2xl sm:text-3xl font-bold text-slate-800">ระบบช่วยตรวจการบ้านและเอกสารอัจฉริยะ</h1>
+                <p class="text-slate-500 max-w-xl text-sm sm:text-base">ตรวจประเมินคำตอบโดยอัตโนมัติจากไฟล์ภาพ, ไฟล์เอกสาร PDF, Word (.docx) หรือดึงข้อมูลจากลิงก์ Google Docs ของคุณ</p>
+            </div>
+            <div class="flex items-center gap-4 bg-white/80 backdrop-blur px-5 py-4 rounded-2xl border border-pink-100/50 shadow-sm">
+                <div class="text-right">
+                    <span class="text-xs text-slate-400 block font-medium">วิเคราะห์ข้อมูลโดย</span>
+                    <span class="font-bold text-slate-700 text-sm">Google Gemini 2.5 Flash</span>
+                </div>
+                <div class="bg-blue-50 text-blue-600 p-2.5 rounded-xl animate-pulse">
+                    <i class="fa-solid fa-bolt text-lg"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Working Workspace -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            <!-- Left Workspace: Input Fields (5 Columns) -->
+            <div class="lg:col-span-5 space-y-6">
+                <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-5">
+                    <div class="flex items-center space-x-2 pb-3 border-b border-slate-100">
+                        <span class="bg-pink-100 text-brand-600 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold">1</span>
+                        <h2 class="text-lg font-semibold text-slate-800">ข้อมูลการประเมิน</h2>
+                    </div>
+
+                    <!-- Rubric and Instructions -->
+                    <div class="space-y-2">
+                        <label for="rubricInput" class="block text-sm font-semibold text-slate-700 flex justify-between">
+                            <span>โจทย์ และ เกณฑ์การให้คะแนน</span>
+                            <span class="text-xs font-normal text-slate-400">(ยิ่งใส่ละเอียด AI ยิ่งตรวจตรงจุด)</span>
+                        </label>
+                        <textarea id="rubricInput" rows="4" class="w-full px-4 py-3 text-sm rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-400 focus:border-brand-400 outline-none transition-all placeholder:text-slate-400 resize-none" placeholder="ตัวอย่าง:&#10;[โจทย์] จงอธิบายระบบนิเวศน์แบบย่อ&#10;[เกณฑ์คะแนนเต็ม 10]&#10;- อธิบายความสัมพันธ์ของสิ่งมีชีวิตและสิ่งแวดล้อมชัดเจน (5 คะแนน)&#10;- ยกตัวอย่างผู้ผลิต ผู้บริโภค และผู้ย่อยสลายได้ถูกต้อง (5 คะแนน)"></textarea>
+                    </div>
+
+                    <!-- Link Import Area (Google Docs / Web Link) -->
+                    <div class="space-y-2">
+                        <label class="block text-sm font-semibold text-slate-700 flex justify-between">
+                            <span>ดึงเนื้อหาจากลิงก์ Google Docs</span>
+                            <span class="text-xs text-brand-500 hover:underline cursor-pointer" onclick="showShareGuide()">วิธีตั้งค่าลิงก์ ❓</span>
+                        </label>
+                        <div class="flex gap-2">
+                            <input type="text" id="docLinkInput" class="flex-grow px-4 py-2.5 text-sm rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-400 focus:border-brand-400 outline-none transition-all placeholder:text-slate-400" placeholder="https://docs.google.com/document/d/.../edit">
+                            <button onclick="importFromGoogleDocs()" class="bg-pink-100 hover:bg-pink-200 text-brand-600 px-4 py-2.5 rounded-xl font-semibold text-sm transition duration-150 flex items-center gap-1.5 shrink-0">
+                                <i class="fa-solid fa-link"></i> ดึงข้อความ
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Drag & Drop Zone -->
+                    <div class="space-y-2">
+                        <label class="block text-sm font-semibold text-slate-700">แนบไฟล์รูปภาพ หรือไฟล์เอกสาร (.docx, .pdf)</label>
+                        <div id="dropZone" class="border-2 border-dashed border-slate-200 hover:border-brand-300 rounded-2xl p-6 text-center cursor-pointer transition-all bg-slate-50/50 hover:bg-brand-50/10 flex flex-col items-center justify-center relative">
+                            <input type="file" id="fileInput" accept="image/*,.pdf,.docx" class="hidden" multiple>
+                            <div class="space-y-2">
+                                <div class="w-12 h-12 rounded-full bg-pink-100 text-brand-500 flex items-center justify-center mx-auto mb-1 shadow-sm">
+                                    <i class="fa-solid fa-file-circle-plus text-lg"></i>
+                                </div>
+                                <p class="text-sm font-medium text-slate-700">คลิกเพื่ออัปโหลด หรือลากไฟล์มาวางที่นี่</p>
+                                <p class="text-xs text-slate-400">รองรับ JPG, PNG, PDF และ Word (.docx) รวมกันได้หลายไฟล์</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- List of Attached Files -->
+                    <div id="attachedFilesArea" class="hidden space-y-2">
+                        <span class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">ไฟล์ที่แนบแล้ว (<span id="fileCount">0</span> ไฟล์)</span>
+                        <div id="fileListContainer" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                            <!-- Dynamic File Items will go here -->
+                        </div>
+                    </div>
+
+                    <!-- Process Submit Button -->
+                    <button id="processBtn" onclick="runHomeworkGrading()" class="w-full bg-gradient-to-r from-brand-500 to-pink-500 hover:from-brand-600 hover:to-pink-600 text-white py-4 rounded-2xl font-semibold shadow-lg shadow-brand-100 flex items-center justify-center space-x-2 transition duration-200 hover:-translate-y-0.5 active:translate-y-0">
+                        <i class="fa-solid fa-circle-check"></i>
+                        <span>เริ่มตรวจการบ้านด้วย AI</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Workspace: Result & Recommendation Panel (7 Columns) -->
+            <div class="lg:col-span-7 space-y-6">
+                <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm min-h-[500px] flex flex-col">
+                    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <div class="flex items-center space-x-2">
+                            <span class="bg-pink-100 text-brand-600 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold">2</span>
+                            <h2 class="text-lg font-semibold text-slate-800">ผลการประเมินจาก AI</h2>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button id="copyBtn" onclick="copyResultText()" disabled class="p-2 text-slate-400 hover:text-brand-500 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="คัดลอกผลลัพธ์">
+                                <i class="fa-regular fa-copy text-lg"></i>
+                            </button>
+                            <button id="printBtn" onclick="window.print()" disabled class="p-2 text-slate-400 hover:text-brand-500 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="พิมพ์ผลลัพธ์">
+                                <i class="fa-solid fa-print text-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Placeholder Status -->
+                    <div id="resultPlaceholder" class="flex-grow flex flex-col items-center justify-center text-center p-8">
+                        <div class="w-20 h-20 rounded-full bg-slate-50 text-slate-300 flex items-center justify-center mb-4 border border-slate-100">
+                            <i class="fa-solid fa-clipboard-question text-3xl"></i>
+                        </div>
+                        <h3 class="text-slate-700 font-semibold mb-1">ยังไม่มีผลการตรวจในขณะนี้</h3>
+                        <p class="text-slate-400 text-sm max-w-sm">โปรดระบุเกณฑ์การตรวจ อัปโหลดภาพหรือแนบไฟล์ และกดปุ่มตรวจทางซ้ายมือ</p>
+                    </div>
+
+                    <!-- Loading Spinner Status -->
+                    <div id="resultLoading" class="hidden flex-grow flex flex-col items-center justify-center text-center p-8">
+                        <div class="relative w-16 h-16 mb-4">
+                            <!-- Dual ring spinner -->
+                            <div class="absolute inset-0 border-4 border-pink-100 rounded-full"></div>
+                            <div class="absolute inset-0 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                        <h3 class="text-slate-700 font-semibold mb-1" id="loadingTitle">AI กำลังวิเคราะห์ข้อมูล</h3>
+                        <p class="text-slate-400 text-sm max-w-sm" id="loadingText">ระบบกำลังดึงข้อมูล สกัดเนื้อหาจากเกณฑ์ และเปรียบเทียบคำตอบด้วย AI อย่างละเอียด...</p>
+                    </div>
+
+                    <!-- Actual Result Rendering Panel -->
+                    <div id="resultPanel" class="hidden flex-grow flex flex-col justify-between pt-6">
+                        <div id="printArea" class="space-y-6">
+                            <!-- Overall Score Header Badge -->
+                            <div class="flex items-center justify-between p-4 bg-brand-50/50 border border-brand-100 rounded-2xl">
+                                <div>
+                                    <h4 class="text-brand-700 font-bold text-sm">ผลประเมินสุทธิ</h4>
+                                    <p class="text-slate-400 text-xs">คำนวณและแจกแจงตามน้ำหนักคะแนน</p>
+                                </div>
+                                <div class="text-right">
+                                    <span id="resultScore" class="text-3xl font-extrabold text-brand-600">0</span>
+                                    <span class="text-slate-400 font-medium text-sm"> คะแนน</span>
+                                </div>
+                            </div>
+
+                            <!-- Score Breakdown Items -->
+                            <div class="space-y-3">
+                                <h4 class="text-sm font-semibold text-slate-600 uppercase tracking-wider">รายละเอียดเกณฑ์การให้คะแนน</h4>
+                                <div id="breakdownContainer" class="space-y-3">
+                                    <!-- Dynamic elements inserted here -->
+                                </div>
+                            </div>
+
+                            <!-- Overall Feedback Memo -->
+                            <div class="space-y-2 pt-2">
+                                <h4 class="text-sm font-semibold text-slate-600 uppercase tracking-wider">ความคิดเห็นและคำแนะนำจาก AI ครู</h4>
+                                <div class="bg-slate-50 border border-slate-100 p-4 rounded-2xl">
+                                    <p id="overallComment" class="text-sm leading-relaxed text-slate-600 whitespace-pre-line"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Reset and Start New Section -->
+                        <div class="border-t border-slate-100 pt-6 mt-6 flex justify-end">
+                            <button onclick="resetAll()" class="px-5 py-2.5 text-sm font-medium text-slate-500 hover:text-brand-500 hover:bg-brand-50/40 rounded-xl transition-all">
+                                <i class="fa-solid fa-rotate-left mr-1"></i> เริ่มต้นใหม่
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer Area (ดับเบิลคลิกตรงข้อความลิขสิทธิ์นี้เพื่อเป็นทางลัดลับได้เช่นกัน) -->
+    <footer class="bg-white border-t border-slate-100 mt-12 py-6 select-none cursor-help" ondblclick="toggleSettingsModal()">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-2">
+            <p class="text-sm text-slate-400">Gradely Lite - ออกแบบเพื่อการเรียนรู้อย่างมีความปลอดภัยสูงแบบ Stateless 🔒</p>
+            <p class="text-xs text-slate-400">© 2026 Gradely App. ข้อมูลของคุณจะไม่ถูกบันทึกไว้ในระบบเพื่อความปลอดภัยส่วนบุคคล</p>
+        </div>
+    </footer>
+
+    <!-- หน้าต่างการเชื่อมต่อคีย์ลับ (Secret Settings Modal) สำหรับผู้พัฒนาเท่านั้น -->
+    <div id="settingsModal" class="hidden fixed inset-0 z-[110] flex items-center justify-center p-4">
+        <!-- Backdrop -->
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="toggleSettingsModal()"></div>
+        <!-- Modal Content Box -->
+        <div class="relative bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <div class="bg-pink-100 text-brand-600 p-2 rounded-xl">
+                        <i class="fa-solid fa-gears"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-800">แผงควบคุมระบบลับ (Developer Settings)</h3>
+                </div>
+                <button onclick="toggleSettingsModal()" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Tab Navigation Header -->
+            <div class="flex border-b border-slate-100">
+                <button id="tabDriveBtn" onclick="switchTab('drive')" class="flex-1 pb-3 text-sm font-bold text-brand-600 border-b-2 border-brand-500 transition-colors">
+                    <i class="fa-solid fa-cloud mr-1"></i> ดึงผ่าน Google Drive
+                </button>
+                <button id="tabManualBtn" onclick="switchTab('manual')" class="flex-1 pb-3 text-sm font-medium text-slate-400 hover:text-slate-600 transition-colors">
+                    <i class="fa-solid fa-keyboard mr-1"></i> กรอกคีย์เองตรงๆ
+                </button>
+            </div>
+
+            <!-- TAB 1: Google Drive Method -->
+            <div id="tabDriveContent" class="space-y-4">
+                <p class="text-sm text-slate-500 leading-relaxed">
+                    วางลิงก์ Google Doc (ที่เปิดแชร์แบบสาธารณะแล้ว) ระบบจะดึงและแปลงข้อมูลเพื่อนำ API Key ออกมาใช้งานให้โดยอัตโนมัติ
+                </p>
+                
+                <div class="space-y-2">
+                    <label for="driveUrlInput" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider">ลิงก์ Google Doc (แชร์สาธารณะ)</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                            <i class="fa-solid fa-link"></i>
+                        </span>
+                        <input type="text" id="driveUrlInput" class="w-full pl-10 pr-4 py-3 text-sm rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-400 focus:border-brand-400 outline-none transition-all placeholder:text-slate-400" placeholder="https://docs.google.com/document/d/1NYkwqUVKK8YUTNg...">
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-2">
+                    <button onclick="fetchKeyFromDrive()" id="btnFetchDrive" class="w-full py-3 bg-brand-50 bg-brand-100/50 hover:bg-brand-100 text-brand-600 text-xs font-bold rounded-xl border border-brand-200 transition-all flex items-center justify-center space-x-1">
+                        <i class="fa-solid fa-arrows-rotate animate-duration-1000"></i>
+                        <span>ดึงข้อมูลและทดสอบคีย์ล่าสุด</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- TAB 2: Manual Method -->
+            <div id="tabManualContent" class="hidden space-y-4">
+                <p class="text-sm text-slate-500 leading-relaxed">
+                    กรอก <strong>Google Gemini API Key</strong> ลงในเบราว์เซอร์ชั่วคราวเพื่อใช้ในการตรวจทดสอบระบบ
+                </p>
+                <div class="space-y-2">
+                    <label for="apiKeyInput" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Gemini API Key</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                            <i class="fa-solid fa-key"></i>
+                        </span>
+                        <input type="password" id="apiKeyInput" class="w-full pl-10 pr-4 py-3 text-sm rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-400 focus:border-brand-400 outline-none transition-all placeholder:text-slate-400" placeholder="AIzaSy...">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Action Buttons -->
+            <div class="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
+                <button onclick="clearAllKeys()" class="px-4 py-2.5 text-xs font-semibold text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all">ล้างค่าทั้งหมด</button>
+                <button onclick="saveSettings()" class="px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold rounded-xl shadow-md transition-all">บันทึกและรันคีย์</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script Area for State Management & API logic -->
+    <script>
+        // Set PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+
+        // =========================================================================
+        // 🔒 สำหรับผู้พัฒนา (DEVELOPER SETTINGS - HARDCODE VALUES HERE) 🔒
+        // =========================================================================
+        //
+        // 1. DEFAULT_API_KEY: 
+        //    กรอกรหัส Gemini API Key ของคุณโดยตรง (เช่น "AIzaSyD-xxxxxxxxxxxxxx")
+        const DEFAULT_API_KEY = ""; 
+
+        // 2. DEFAULT_PUBLISHED_DOC_URL:
+        //    นำลิงก์ Google Doc (แบบเปิดแชร์สาธารณะให้ทุกคนเข้าถึงได้เป็น Viewer) มาวางตรงนี้ได้เลย
+        //    ระบบจะทำการแปลงลิงก์เป็น Plain Text และทะลวงผ่าน CORS Proxy ให้เองอัตโนมัติครับ
+        const DEFAULT_PUBLISHED_DOC_URL = "https://docs.google.com/document/d/1NYkwqUVKK8YUTNgT1fVMJ7X5ztTFulLXmbhiaspgm40/edit?usp=sharing"; 
+        // =========================================================================
+
+        // State Management for Attached Files
+        let attachedFiles = [];
+        let activeTab = "drive";
+
+        window.addEventListener('load', () => {
+            initializeDragAndDrop();
+            loadStoredSettings();
+        });
+
+        // Switch settings modal tabs
+        function switchTab(tab) {
+            activeTab = tab;
+            const tabDriveBtn = document.getElementById('tabDriveBtn');
+            const tabManualBtn = document.getElementById('tabManualBtn');
+            const tabDriveContent = document.getElementById('tabDriveContent');
+            const tabManualContent = document.getElementById('tabManualContent');
+
+            if (tab === 'drive') {
+                tabDriveBtn.className = "flex-1 pb-3 text-sm font-bold text-brand-600 border-b-2 border-brand-500 transition-colors";
+                tabManualBtn.className = "flex-1 pb-3 text-sm font-medium text-slate-400 hover:text-slate-600 transition-colors";
+                tabDriveContent.classList.remove('hidden');
+                tabManualContent.classList.add('hidden');
+            } else {
+                tabManualBtn.className = "flex-1 pb-3 text-sm font-bold text-brand-600 border-b-2 border-brand-500 transition-colors";
+                tabDriveBtn.className = "flex-1 pb-3 text-sm font-medium text-slate-400 hover:text-slate-600 transition-colors";
+                tabManualContent.classList.remove('hidden');
+                tabDriveContent.classList.add('hidden');
+            }
+        }
+
+        // Toggle Secret Settings Modal
+        function toggleSettingsModal() {
+            const modal = document.getElementById('settingsModal');
+            modal.classList.toggle('hidden');
+            if (!modal.classList.contains('hidden')) {
+                document.getElementById('driveUrlInput').value = localStorage.getItem('gradely_drive_url') || DEFAULT_PUBLISHED_DOC_URL;
+                document.getElementById('apiKeyInput').value = sessionStorage.getItem('gradely_manual_key') || DEFAULT_API_KEY;
+                
+                if (sessionStorage.getItem('gradely_manual_key')) {
+                    switchTab('manual');
+                } else {
+                    switchTab('drive');
+                }
+            }
+        }
+
+        // Normalize any Google Doc URL into plain text download link
+        function normalizeGoogleDocUrl(url) {
+            if (!url) return "";
+            
+            // Check if it's already a published web link
+            if (url.includes("/pub")) {
+                if (!url.includes("output=txt")) {
+                    return url + (url.includes("?") ? "&" : "?") + "output=txt";
+                }
+                return url;
+            }
+            
+            // Parse Doc ID from edit/sharing link
+            const matches = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+            if (matches && matches[1]) {
+                return `https://docs.google.com/document/d/${matches[1]}/export?format=txt`;
+            }
+            return url;
+        }
+
+        // Clean and extract Gemini API key starting with AIzaSy using Regex
+        function cleanApiKey(rawText) {
+            if (!rawText) return "";
+            
+            // Regex to find a pattern starting with AIzaSy followed by standard characters
+            const match = rawText.match(/AIzaSy[a-zA-Z0-9-_]+/);
+            if (match) {
+                return match[0].trim();
+            }
+            
+            // Fallback general cleaning
+            let clean = rawText.replace(/<[^>]*>/g, '');
+            clean = clean.replace(/['"“”]/g, '');
+            clean = clean.replace(/[\s\r\n\t\u200B\u200C\u200D\uFEFF]/g, '');
+            return clean.trim();
+        }
+
+        // Fetch and resolve API Key using CORS-bypass fallback proxy chain (Auto-detect)
+        async function getActiveApiKey() {
+            // Priority 1: Direct Hardcoded API Key
+            if (DEFAULT_API_KEY) {
+                const cleaned = cleanApiKey(DEFAULT_API_KEY);
+                if (cleaned.startsWith("AIzaSy")) return cleaned;
+            }
+
+            // Priority 2: Manual Key Input (Session only)
+            const manualKey = sessionStorage.getItem('gradely_manual_key');
+            if (manualKey) {
+                const cleaned = cleanApiKey(manualKey);
+                if (cleaned.startsWith("AIzaSy")) return cleaned;
+            }
+
+            // Priority 3: Try using cached resolved Google Drive Key
+            const cachedResolvedKey = sessionStorage.getItem('gradely_resolved_key');
+            if (cachedResolvedKey) return cachedResolvedKey;
+
+            // Priority 4: Fetch fresh key dynamically from published Google Doc link
+            const driveUrl = localStorage.getItem('gradely_drive_url') || DEFAULT_PUBLISHED_DOC_URL;
+            if (driveUrl && !driveUrl.includes("xxxxxxxxx")) {
+                try {
+                    const fetchedKey = await fetchKeyPlaintext(driveUrl);
+                    const cleaned = cleanApiKey(fetchedKey);
+                    if (cleaned && cleaned.startsWith("AIzaSy")) {
+                        sessionStorage.setItem('gradely_resolved_key', cleaned);
+                        return cleaned;
+                    }
+                } catch (e) {
+                    console.error("Auto fetch from Google Drive failed:", e);
+                }
+            }
+            return null;
+        }
+
+        // Advanced plaintext fetching with multiple fallback proxy strategies for iframe embedding
+        async function fetchKeyPlaintext(url) {
+            const normalizedUrl = normalizeGoogleDocUrl(url);
+            if (!normalizedUrl) return null;
+
+            // List of strategies to bypass CORS (Essential for Google Sites iframes)
+            const fetchStrategies = [
+                // Strategy 1: Direct fetch (in case it works, i.e. local)
+                async () => {
+                    const res = await fetch(normalizedUrl);
+                    if (!res.ok) throw new Error("Direct fetch failed");
+                    return await res.text();
+                },
+                // Strategy 2: AllOrigins proxy (very robust client-side bypass)
+                async () => {
+                    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(normalizedUrl)}&_=` + Date.now();
+                    const res = await fetch(proxyUrl);
+                    if (!res.ok) throw new Error("AllOrigins proxy failed");
+                    const json = await res.json();
+                    return json.contents;
+                },
+                // Strategy 3: Codetabs proxy
+                async () => {
+                    const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(normalizedUrl)}`;
+                    const res = await fetch(proxyUrl);
+                    if (!res.ok) throw new Error("Codetabs proxy failed");
+                    return await res.text();
+                },
+                // Strategy 4: Corsproxy.io as fallback
+                async () => {
+                    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(normalizedUrl)}`;
+                    const res = await fetch(proxyUrl);
+                    if (!res.ok) throw new Error("Corsproxy failed");
+                    return await res.text();
+                }
+            ];
+
+            for (let i = 0; i < fetchStrategies.length; i++) {
+                try {
+                    const result = await fetchStrategies[i]();
+                    if (result && result.trim()) {
+                        // Check if the result resolves to Google Login page redirect (means Doc is private)
+                        if (result.includes("ServiceLogin") || result.includes("accounts.google.com")) {
+                            console.warn(`Fetch strategy ${i} hit private Google Doc restriction.`);
+                            sessionStorage.setItem('gradely_resolve_error', 'private_doc');
+                            continue;
+                        }
+                        const cleaned = cleanApiKey(result);
+                        if (cleaned && cleaned.startsWith("AIzaSy")) {
+                            sessionStorage.removeItem('gradely_resolve_error');
+                            return cleaned;
+                        }
+                    }
+                } catch (e) {
+                    console.warn(`Fetch strategy ${i} failed:`, e);
+                }
+            }
+            return null;
+        }
+
+        // Connection Diagnostics Tool (ระบบช่วยตรวจวิเคราะห์ปัญหาเพื่อชี้แจงผู้พัฒนา)
+        async function runDiagnostics() {
+            alertCustom(`
+                <div class="space-y-3">
+                    <h3 class="font-bold text-slate-800 text-sm">กำลังทดสอบเชื่อมต่อและดึงข้อมูล API Key...</h3>
+                    <div id="diagLoading" class="flex items-center justify-center space-x-2 py-4 text-slate-500">
+                        <i class="fa-solid fa-circle-notch animate-spin text-brand-500 text-lg"></i>
+                        <span class="text-xs">ระบบกำลังจำลองดึงข้อความจาก Google Doc แบบเรียลไทม์...</span>
+                    </div>
+                    <div id="diagResult" class="hidden text-xs text-left p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 whitespace-pre-line"></div>
+                </div>
+            `);
+
+            const driveUrl = localStorage.getItem('gradely_drive_url') || DEFAULT_PUBLISHED_DOC_URL;
+            const diagLoading = document.getElementById('diagLoading');
+            const diagResult = document.getElementById('diagResult');
+
+            if (!driveUrl || driveUrl.includes("xxxxxxxxx")) {
+                diagLoading.className = "hidden";
+                diagResult.className = "text-xs text-left p-4 bg-red-50 text-red-700 border border-red-100 rounded-xl space-y-2";
+                diagResult.innerHTML = `
+                    <strong>❌ ไม่พบคิวอ้างอิงไฟล์ Google Doc ปลายทาง</strong><br>
+                    - กรุณาเปิดโค้ดในระบบแล้วแก้ไขระบุลิงก์เอกสาร Google Doc ของคุณลงในตัวแปร <code>DEFAULT_PUBLISHED_DOC_URL</code>
+                `;
+                return;
+            }
+
+            try {
+                sessionStorage.removeItem('gradely_resolve_error');
+                const rawKey = await fetchKeyPlaintext(driveUrl);
+                const cleaned = cleanApiKey(rawKey);
+
+                diagLoading.className = "hidden";
+                diagResult.className = "text-xs text-left p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2";
+
+                if (cleaned && cleaned.startsWith("AIzaSy")) {
+                    diagResult.className = "text-xs text-left p-4 bg-emerald-50 text-emerald-800 border border-emerald-100 rounded-xl space-y-2";
+                    diagResult.innerHTML = `
+                        <strong>✅ ดึงข้อมูลสำเร็จและตรวจสอบแล้ว คีย์พร้อมใช้งาน!</strong><br>
+                        - ดึงคีย์ได้สำเร็จ: <code>${cleaned.substring(0, 10)}**********</code><br>
+                        - ข้อมูลทุกอย่างถูกต้องและเชื่อมต่อ Gemini API ได้เรียบร้อยแล้ว
+                    `;
+                    sessionStorage.setItem('gradely_resolved_key', cleaned);
+                    updateUIStatus(true);
+                } else {
+                    const errReason = sessionStorage.getItem('gradely_resolve_error');
+                    if (errReason === 'private_doc' || (!rawKey && (driveUrl.includes("edit") || driveUrl.includes("sharing")))) {
+                        diagResult.className = "text-xs text-left p-4 bg-red-50 text-red-700 border border-red-100 rounded-xl space-y-2";
+                        diagResult.innerHTML = `
+                            <strong>❌ ดึงคีย์ไม่สำเร็จ (ไฟล์ Google Doc ปิดกั้นสิทธิ์การเข้าถึง)</strong><br>
+                            - <u>สาเหตุ:</u> เอกสาร Google Doc ของคุณตั้งค่าเป็นแบบ <strong>"จำกัดสิทธิ์ (Private)"</strong> ทำให้ระบบและ CORS Proxy ภายนอกไม่มีสิทธิ์อ่านข้อมูล<br><br>
+                            <strong>💡 วิธีแก้ไขอย่างง่ายดาย:</strong><br>
+                            1. เปิดเอกสาร Google Doc ของคุณขึ้นมา<br>
+                            2. กดปุ่มสีน้ำเงิน <strong>"แชร์" (Share)</strong> ตรงมุมขวาบนของเอกสาร<br>
+                            3. ในหัวข้อ <strong>"การเข้าถึงทั่วไป" (General Access)</strong> ให้เปลี่ยนจาก <em>"จำกัด" (Restricted)</em> เป็น <strong>"ทุกคนที่มีลิงก์" (Anyone with the link)</strong> และกำหนดบทบาทเป็น <strong>"ผู้มีสิทธิ์อ่าน" (Viewer)</strong><br>
+                            4. รีเฟรชหน้านี้และทดลองใหม่อีกครั้ง
+                        `;
+                    } else {
+                        diagResult.className = "text-xs text-left p-4 bg-red-50 text-red-700 border border-red-100 rounded-xl space-y-2";
+                        diagResult.innerHTML = `
+                            <strong>❌ ไม่พบคีย์ขึ้นต้นด้วย AIzaSy ภายในเอกสาร</strong><br>
+                            - ระบบเชื่อมโยงเอกสารได้ แต่สแกนหาข้อความที่ขึ้นต้นด้วย <code>AIzaSy</code> ไม่เจอ<br>
+                            - โปรดตรวจสอบว่าคุณได้วางคีย์ลงไปตรงๆ ในเอกสารแล้วเรียบร้อยโดยไม่มีสัญลักษณ์คำพูดปะปน
+                        `;
+                    }
+                }
+            } catch (e) {
+                diagLoading.className = "hidden";
+                diagResult.className = "text-xs text-left p-4 bg-red-50 text-red-700 border border-red-100 rounded-xl space-y-2";
+                diagResult.innerHTML = `
+                    <strong>❌ การดึงข้อมูลล้มเหลว (Network/CORS Error)</strong><br>
+                    - เบราว์เซอร์บล็อกการข้ามโดเมน หรือไม่สามารถติดต่ออินเทอร์เน็ตเพื่อดึงข้อมูลได้<br>
+                    - โปรดตรวจสอบสถานะการเปิดแชร์ของลิงก์ Google Doc อีกครั้งให้เป็นแบบสาธารณะ
+                `;
+            }
+        }
+
+        // Save customized settings from manual/drive tab
+        async function saveSettings() {
+            const driveUrl = document.getElementById('driveUrlInput').value.trim();
+            const manualKey = document.getElementById('apiKeyInput').value.trim();
+
+            if (activeTab === 'drive') {
+                if (driveUrl && !driveUrl.includes("xxxxxxxxx")) {
+                    localStorage.setItem('gradely_drive_url', driveUrl);
+                    sessionStorage.removeItem('gradely_manual_key');
+                    sessionStorage.removeItem('gradely_resolved_key');
+                } else {
+                    localStorage.removeItem('gradely_drive_url');
+                }
+            } else {
+                if (manualKey) {
+                    sessionStorage.setItem('gradely_manual_key', manualKey);
+                    localStorage.removeItem('gradely_drive_url');
+                    sessionStorage.removeItem('gradely_resolved_key');
+                } else {
+                    sessionStorage.removeItem('gradely_manual_key');
+                }
+            }
+
+            await loadStoredSettings();
+            toggleSettingsModal();
+        }
+
+        // Clear all keys
+        function clearAllKeys() {
+            localStorage.removeItem('gradely_drive_url');
+            sessionStorage.removeItem('gradely_manual_key');
+            sessionStorage.removeItem('gradely_resolved_key');
+            document.getElementById('driveUrlInput').value = "";
+            document.getElementById('apiKeyInput').value = "";
+            updateUIStatus(false);
+            toggleSettingsModal();
+            alertCustom("ล้างค่าการเชื่อมต่อและคีย์ทั้งหมดเรียบร้อยแล้ว");
+        }
+
+        // Manual testing action for verifying Google Docs publish file configuration
+        async function fetchKeyFromDrive() {
+            const btn = document.getElementById('btnFetchDrive');
+            const driveUrl = document.getElementById('driveUrlInput').value.trim();
+
+            if (!driveUrl || driveUrl.includes("xxxxxxxxx")) {
+                alertCustom("กรุณาระบุลิงก์ Google Doc จริงของคุณ (ห้ามใช้ลิงก์ตัวอย่างที่มีอักษร xxxxx)");
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fa-solid fa-circle-notch animate-spin mr-1"></i> กำลังเชื่อมต่อ...`;
+
+            const rawKey = await fetchKeyPlaintext(driveUrl);
+            const cleanedKey = cleanApiKey(rawKey);
+            
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fa-solid fa-arrows-rotate mr-1"></i> ดึงข้อมูลและทดสอบคีย์ล่าสุด`;
+
+            if (cleanedKey && cleanedKey.startsWith("AIzaSy")) {
+                alertCustom("เชื่อมต่อสำเร็จ!<br><br>พบ API Key: <code class='bg-slate-100 p-1 rounded font-mono text-xs'>" + cleanedKey.substring(0, 10) + "**********</code>");
+                localStorage.setItem('gradely_drive_url', driveUrl);
+                sessionStorage.removeItem('gradely_manual_key');
+                sessionStorage.setItem('gradely_resolved_key', cleanedKey);
+                updateUIStatus(true);
+            } else {
+                let diagnosticInfo = "ไม่สามารถอ่านคีย์ได้ โปรดตรวจสอบความถูกต้องของลิงก์และสิทธิ์การเข้าถึงไฟล์";
+                if (rawKey && rawKey.includes("<html") && !rawKey.includes("AIzaSy")) {
+                    diagnosticInfo = "ไม่พบคีย์ในไฟล์ หรือเอกสารนี้ไม่ได้เปิดแชร์แบบสาธารณะ กรุณาตั้งค่าแชร์เป็น 'ทุกคนที่มีลิงก์มีสิทธิ์อ่าน'";
+                }
+                alertCustom(`<strong>ดึงคีย์ไม่สำเร็จ!</strong><br><br><span class='text-red-500 text-xs'>สาเหตุ: ${diagnosticInfo}</span>`);
+            }
+        }
+
+        // Update UI Status Badge
+        function updateUIStatus(isActive) {
+            const badge = document.getElementById('statusBadge');
+            const indicator = document.getElementById('statusIndicator');
+            const text = document.getElementById('statusText');
+
+            if (isActive) {
+                badge.className = "flex items-center space-x-2 bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl border border-emerald-100 text-sm font-medium transition-colors duration-300 cursor-pointer hover:bg-emerald-100";
+                indicator.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+                text.textContent = "ระบบ AI พร้อมใช้งาน";
+                badge.onclick = () => alertCustom("ระบบดึง API Key ได้ถูกต้องและพร้อมสแกนตรวจประเมินบทเรียนแล้วครับ");
+            } else {
+                badge.className = "flex items-center space-x-2 bg-red-50 text-red-600 px-4 py-2 rounded-xl border border-red-100 text-sm font-medium transition-colors duration-300 cursor-pointer hover:bg-red-100";
+                indicator.className = "w-2 h-2 rounded-full bg-red-500";
+                text.textContent = "ระบบ AI ไม่พร้อมใช้งาน (คลิกที่นี่เพื่อหาสาเหตุ)";
+                badge.onclick = () => runDiagnostics(); // Trigger connection troubleshooter!
+            }
+        }
+
+        // On-load automatic config fetch and test
+        async function loadStoredSettings() {
+            const activeKey = await getActiveApiKey();
+            if (activeKey) {
+                updateUIStatus(true);
+                return;
+            }
+
+            const driveUrl = localStorage.getItem('gradely_drive_url') || DEFAULT_PUBLISHED_DOC_URL;
+            if (driveUrl && !driveUrl.includes("xxxxxxxxx")) {
+                try {
+                    const rawKey = await fetchKeyPlaintext(driveUrl);
+                    const cleaned = cleanApiKey(rawKey);
+                    if (cleaned && cleaned.startsWith("AIzaSy")) {
+                        sessionStorage.setItem('gradely_resolved_key', cleaned);
+                        updateUIStatus(true);
+                        console.log("Automatically resolved silent Google Drive API Key successfully.");
+                    } else {
+                        updateUIStatus(false);
+                    }
+                } catch (e) {
+                    console.error("Auto fetch failed on load:", e);
+                    updateUIStatus(false);
+                }
+            } else {
+                updateUIStatus(false);
+            }
+        }
+
+        // Drag & Drop & Upload Area Events
+        function initializeDragAndDrop() {
+            const dropZone = document.getElementById('dropZone');
+            const fileInput = document.getElementById('fileInput');
+
+            dropZone.addEventListener('click', () => fileInput.click());
+
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('border-brand-500', 'bg-brand-50/25');
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('border-brand-500', 'bg-brand-50/25');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-brand-500', 'bg-brand-50/25');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handleFilesSelection(files);
+                }
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleFilesSelection(e.target.files);
+                }
+            });
+        }
+
+        // Handle file parsing and queue adding
+        async function handleFilesSelection(files) {
+            for (let file of files) {
+                const id = 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+                const name = file.name;
+
+                if (file.type.startsWith('image/')) {
+                    // Process Image to Base64
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const base64Data = reader.result.split(',')[1];
+                        addAttachedFile({ id, name, type: 'image', content: base64Data, rawMime: file.type, previewSrc: reader.result });
+                    };
+                    reader.readAsDataURL(file);
+                } 
+                else if (file.name.endsWith('.pdf')) {
+                    // Read PDF Text
+                    const reader = new FileReader();
+                    reader.onload = async () => {
+                        const typedarray = new Uint8Array(reader.result);
+                        try {
+                            const pdfText = await extractTextFromPDF(typedarray);
+                            addAttachedFile({ id, name, type: 'pdf', content: pdfText });
+                        } catch (err) {
+                            alertCustom("เกิดข้อผิดพลาดขณะอ่านข้อมูลไฟล์ PDF นี้: " + name);
+                        }
+                    };
+                    reader.readAsArrayBuffer(file);
+                } 
+                else if (file.name.endsWith('.docx')) {
+                    // Read Word Docx Text
+                    const reader = new FileReader();
+                    reader.onload = async () => {
+                        const arrayBuffer = reader.result;
+                        try {
+                            const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+                            addAttachedFile({ id, name, type: 'docx', content: result.value });
+                        } catch (err) {
+                            alertCustom("เกิดข้อผิดพลาดขณะอ่านข้อมูลไฟล์ Word (.docx) นี้: " + name);
+                        }
+                    };
+                    reader.readAsArrayBuffer(file);
+                } 
+                else {
+                    alertCustom(`ไม่รองรับประเภทไฟล์: ${file.name} (กรุณาแนบเฉพาะรูปภาพ, PDF หรือ Word เท่านั้น)`);
+                }
+            }
+        }
+
+        // Helper PDF Text Extractor
+        async function extractTextFromPDF(typedarray) {
+            const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
+            let fullText = "";
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ');
+                fullText += `[หน้า ${i}]\n${pageText}\n\n`;
+            }
+            return fullText.trim();
+        }
+
+        // Import Google Docs Plaintext Content
+        async function importFromGoogleDocs() {
+            const linkInput = document.getElementById('docLinkInput');
+            const url = linkInput.value.trim();
+            if (!url) {
+                alertCustom("กรุณาระบุลิงก์ Google Docs ของคุณก่อนคลิกดึงข้อความครับ");
+                return;
+            }
+
+            // Parse Document ID
+            const matches = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+            if (!matches || matches.length < 2) {
+                alertCustom("รูปแบบลิงก์ไม่ถูกต้อง! กรุณากรอกลิงก์ Google Docs ให้ครบถ้วน");
+                return;
+            }
+
+            const docId = matches[1];
+            const exportUrl = `https://docs.google.com/document/d/${docId}/export?format=txt`;
+
+            document.getElementById('processBtn').disabled = true;
+            linkInput.disabled = true;
+
+            try {
+                const response = await fetch(exportUrl);
+                if (!response.ok) throw new Error("เข้าถึงไฟล์ไม่ได้");
+                const docText = await response.text();
+                
+                const id = 'link_' + Date.now();
+                addAttachedFile({ id, name: `Google Doc (${docId.substr(0,8)}...)`, type: 'link', content: docText.trim() });
+                linkInput.value = ""; // clear
+            } catch (err) {
+                alertCustom("ไม่สามารถดึงข้อมูลได้! โปรดตรวจสอบให้แน่ใจว่าคุณได้แชร์เอกสารแบบ 'ทุกคนที่มีลิงก์มีสิทธิ์อ่าน (Anyone with link can view)' แล้ว");
+            } finally {
+                document.getElementById('processBtn').disabled = false;
+                linkInput.disabled = false;
+            }
+        }
+
+        // Add file metadata to our state management array
+        function addAttachedFile(fileObj) {
+            attachedFiles.push(fileObj);
+            renderAttachedFileList();
+        }
+
+        // Remove file helper
+        function removeAttachedFile(id) {
+            attachedFiles = attachedFiles.filter(item => item.id !== id);
+            renderAttachedFileList();
+        }
+
+        // Re-render Files inside Container UI
+        function renderAttachedFileList() {
+            const container = document.getElementById('fileListContainer');
+            const listArea = document.getElementById('attachedFilesArea');
+            const fileCountSpan = document.getElementById('fileCount');
+
+            if (attachedFiles.length === 0) {
+                listArea.classList.add('hidden');
+                container.innerHTML = "";
+                return;
+            }
+
+            listArea.classList.remove('hidden');
+            fileCountSpan.textContent = attachedFiles.length;
+            container.innerHTML = "";
+
+            attachedFiles.forEach(file => {
+                let iconClass = "fa-file-lines text-slate-500";
+                let badgeColor = "bg-slate-100 text-slate-600";
+                
+                if (file.type === 'image') {
+                    iconClass = "fa-image text-brand-500";
+                    badgeColor = "bg-pink-50 text-brand-600";
+                } else if (file.type === 'pdf') {
+                    iconClass = "fa-file-pdf text-red-500";
+                    badgeColor = "bg-red-50 text-red-600";
+                } else if (file.type === 'docx') {
+                    iconClass = "fa-file-word text-blue-500";
+                    badgeColor = "bg-blue-50 text-blue-600";
+                } else if (file.type === 'link') {
+                    iconClass = "fa-globe text-emerald-500";
+                    badgeColor = "bg-emerald-50 text-emerald-600";
+                }
+
+                const row = document.createElement('div');
+                row.className = "flex items-center justify-between p-3 bg-slate-50 border border-slate-200/60 rounded-xl hover:bg-slate-100/50 transition-colors";
+                row.innerHTML = `
+                    <div class="flex items-center space-x-3 truncate">
+                        <i class="fa-solid ${iconClass} text-lg shrink-0"></i>
+                        <div class="truncate">
+                            <span class="text-sm font-semibold text-slate-700 block truncate">${file.name}</span>
+                            <span class="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded ${badgeColor}">${file.type}</span>
+                        </div>
+                    </div>
+                    <button type="button" onclick="removeAttachedFile('${file.id}')" class="text-slate-400 hover:text-red-500 p-1 transition-colors">
+                        <i class="fa-solid fa-trash-can text-sm"></i>
+                    </button>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        // Guide Modal Box
+        function showShareGuide() {
+            alertCustom(`
+                <strong class="text-slate-800">วิธีการดึงข้อความจาก Google Docs:</strong><br>
+                1. เปิดเอกสารการบ้านของคุณใน Google Docs<br>
+                2. คลิกปุ่ม <strong class="text-brand-500">แชร์ (Share)</strong> มุมขวาบน<br>
+                3. เปลี่ยนสิทธิ์ทั่วไปเป็น <strong class="text-slate-700">"ทุกคนที่มีลิงก์" (Anyone with the link)</strong> และกำหนดเป็น <strong class="text-slate-700">มีสิทธิ์อ่าน (Viewer)</strong><br>
+                4. คัดลอกลิงก์มาวางในช่องและกดดึงข้อมูลได้เลยครับ!
+            `);
+        }
+
+        // Custom UI Alerts
+        function alertCustom(msg) {
+            const existing = document.getElementById('customAlertBox');
+            if (existing) existing.remove();
+
+            const alertBox = document.createElement('div');
+            alertBox.id = "customAlertBox";
+            alertBox.className = "fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/30 backdrop-blur-xs";
+            alertBox.innerHTML = `
+                <div class="bg-white rounded-3xl p-6 max-w-sm w-full text-center space-y-4 shadow-xl border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
+                    <div class="w-12 h-12 bg-pink-100 text-brand-500 rounded-full flex items-center justify-center mx-auto">
+                        <i class="fa-solid fa-circle-exclamation text-xl"></i>
+                    </div>
+                    <div class="space-y-1">
+                        <h4 class="font-bold text-slate-800">แจ้งเตือน</h4>
+                        <div class="text-sm text-slate-500 leading-normal text-left">${msg}</div>
+                    </div>
+                    <button onclick="document.getElementById('customAlertBox').remove()" class="w-full py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-semibold shadow-md shadow-brand-100 transition-all">ตกลง</button>
+                </div>
+            `;
+            document.body.appendChild(alertBox);
+        }
+
+        // Main evaluation pipeline
+        async function runHomeworkGrading() {
+            const rubric = document.getElementById('rubricInput').value.trim();
+            const apiKey = await getActiveApiKey();
+
+            if (!apiKey) {
+                alertCustom("ระบบไม่สามารถเชื่อมโยง API Key ได้ กรุณาดับเบิลคลิกที่โลโก้ Gradely ด้านบนซ้าย เพื่อตรวจสอบการตั้งค่าคีย์ปลายทาง");
+                return;
+            }
+
+            if (!rubric) {
+                alertCustom("กรุณาระบุโจทย์ และเกณฑ์การให้คะแนนอย่างชัดเจน เพื่อนำทางให้ AI เข้าใจผลลัพธ์");
+                return;
+            }
+
+            if (attachedFiles.length === 0) {
+                alertCustom("กรุณาอัปโหลดภาพ, แนบเอกสาร หรือนำเข้าข้อมูล Google Docs อย่างน้อย 1 ไฟล์เพื่อเริ่มต้นการตรวจประเมิน");
+                return;
+            }
+
+            const placeholder = document.getElementById('resultPlaceholder');
+            const loading = document.getElementById('resultLoading');
+            const panel = document.getElementById('resultPanel');
+            const processBtn = document.getElementById('processBtn');
+
+            placeholder.classList.add('hidden');
+            loading.classList.remove('hidden');
+            panel.classList.add('hidden');
+            processBtn.disabled = true;
+            processBtn.innerHTML = `<i class="fa-solid fa-circle-notch animate-spin mr-2"></i> กำลังวิเคราะห์งาน...`;
+
+            // Separate images from text files for the Gemini Payload
+            const imageParts = attachedFiles.filter(f => f.type === 'image');
+            const textFiles = attachedFiles.filter(f => f.type !== 'image');
+
+            // Format extracted texts into cohesive student homework segment
+            let studentsTextSegment = "";
+            textFiles.forEach((file, index) => {
+                studentsTextSegment += `\n\n--- ไฟล์ที่ ${index + 1}: ${file.name} (ประเภท: ${file.type}) ---\n${file.content}`;
+            });
+
+            const systemPrompt = `คุณคือครูและอาจารย์ผู้สอนใจดีและยุติธรรม มีหน้าที่ประเมินและตรวจแก้เอกสารการบ้านหรือไฟล์งานที่แนบผ่านช่องทางออฟฟิศ PDF ตลอดจนภาพถ่าย
+
+จงวิเคราะห์ข้อมูลนักเรียน และตอบกลับมาเป็นรูปแบบของโครงสร้าง JSON ต่อไปนี้เท่านั้น เพื่อให้ระบบประยุกต์ใช้ได้ทันที (ห้ามส่งข้อความคำบรรยายอื่นหรือมาร์กดาวน์เด็ดขาด):
+{
+  "total_score_given": [คะแนนสุทธิรวมที่ได้ตามสัดส่วนการตรวจสอบ],
+  "max_score": [คะแนนเต็มทั้งหมดตามโจทย์รูบริก],
+  "breakdown": [
+    {
+      "criteria": "[ชื่อเกณฑ์ หรือคำอธิบายข้อย่อยหลักตามรูบริก]",
+      "score": [คะแนนย่อย],
+      "max": [คะแนนเต็มข้อย่อย],
+      "comment": "[คำอธิบายผลลัพธ์และจุดที่ต้องการการพัฒนาแก้ไขของนักเรียนในข้อนี้]"
+    }
+  ],
+  "overall_feedback": "[บทวิจารณ์สรุปภาพรวมในเชิงบวก การกระตุ้นให้เรียนรู้ต่อด้วยความมั่นใจและอบอุ่น และสะท้อนให้เห็นแนวคิดที่ยังคลาดเคลื่อน]"
+}`;
+
+            // Combine user prompts
+            const userPrompt = `[ข้อมูลโจทย์และเกณฑ์ประเมิน]:\n${rubric}\n\n[ข้อความ/ผลลัพธ์ภายในเนื้อหาการบ้านของนักเรียน]:\n${studentsTextSegment}`;
+
+            // Construct parts structure
+            const parts = [{ text: userPrompt }];
+            
+            // Add any raw images attached to the Gemini Multimodal pipeline
+            imageParts.forEach(img => {
+                parts.push({
+                    inlineData: {
+                        mimeType: img.rawMime,
+                        data: img.content
+                    }
+                });
+            });
+
+            let success = false;
+            let responseData = null;
+            let retryCount = 0;
+            const maxRetries = 5;
+
+            while (retryCount < maxRetries && !success) {
+                try {
+                    const delay = Math.pow(2, retryCount) * 1000;
+                    if (retryCount > 0) {
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }
+
+                    const payload = {
+                        contents: [{ parts: parts }],
+                        systemInstruction: { parts: [{ text: systemPrompt }] },
+                        generationConfig: { responseMimeType: "application/json" }
+                    };
+
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP Error Status: ${response.status}`);
+                    }
+
+                    const jsonResult = await response.json();
+                    const textResponse = jsonResult.candidates?.[0]?.content?.parts?.[0]?.text;
+                    
+                    if (textResponse) {
+                        responseData = JSON.parse(textResponse);
+                        success = true;
+                    } else {
+                        throw new Error("Empty response content.");
+                    }
+
+                } catch (err) {
+                    retryCount++;
+                    if (retryCount >= maxRetries) {
+                        console.error("Pipeline failed after maximum retries:", err);
+                        alertCustom(`เกิดข้อผิดพลาดในการส่งข้อมูลประเมิน: ${err.message || 'เครือข่ายขัดข้อง'}`);
+                    }
+                }
+            }
+
+            processBtn.disabled = false;
+            processBtn.innerHTML = `<i class="fa-solid fa-circle-check"></i> <span>เริ่มตรวจการบ้านด้วย AI</span>`;
+
+            if (success && responseData) {
+                renderResultToScreen(responseData);
+            } else {
+                placeholder.classList.remove('hidden');
+                loading.classList.add('hidden');
+            }
+        }
+
+        // Render response results
+        function renderResultToScreen(data) {
+            document.getElementById('resultLoading').classList.add('hidden');
+            const panel = document.getElementById('resultPanel');
+            panel.classList.remove('hidden');
+
+            document.getElementById('copyBtn').disabled = false;
+            document.getElementById('printBtn').disabled = false;
+
+            document.getElementById('resultScore').innerHTML = `${data.total_score_given}<span class="text-slate-400 font-normal text-lg">/${data.max_score}</span>`;
+
+            const container = document.getElementById('breakdownContainer');
+            container.innerHTML = "";
+
+            if (data.breakdown && Array.isArray(data.breakdown)) {
+                data.breakdown.forEach(item => {
+                    const ratio = item.score / item.max;
+                    let badgeColor = "bg-red-50 text-red-600 border-red-100";
+                    if (ratio >= 0.8) {
+                        badgeColor = "bg-emerald-50 text-emerald-600 border-emerald-100";
+                    } else if (ratio >= 0.5) {
+                        badgeColor = "bg-amber-50 text-amber-600 border-amber-100";
+                    }
+
+                    const card = document.createElement('div');
+                    card.className = "p-4 border border-slate-100 rounded-2xl flex flex-col md:flex-row md:items-start justify-between gap-3 bg-white hover:shadow-sm transition-shadow";
+                    card.innerHTML = `
+                        <div class="space-y-1">
+                            <span class="text-slate-800 font-semibold text-sm block">${item.criteria}</span>
+                            <span class="text-slate-500 text-xs block leading-relaxed">${item.comment}</span>
+                        </div>
+                        <div class="flex items-center space-x-1.5 self-start shrink-0">
+                            <span class="text-xs px-2.5 py-1 rounded-full font-bold border ${badgeColor}">
+                                ${item.score}/${item.max} คะแนน
+                            </span>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+            }
+
+            document.getElementById('overallComment').textContent = data.overall_feedback;
+        }
+
+        // Text summary copier
+        function copyResultText() {
+            const scoreText = document.getElementById('resultScore').textContent;
+            const overallComment = document.getElementById('overallComment').textContent;
+            
+            let textToCopy = `📋 ผลการประเมินการบ้านจาก Gradely AI:\n\nคะแนนที่ได้: ${scoreText}\n\n`;
+            
+            const breakdownItems = document.querySelectorAll('#breakdownContainer > div');
+            if (breakdownItems.length > 0) {
+                textToCopy += `--- รายละเอียดเกณฑ์การประเมิน ---\n`;
+                breakdownItems.forEach(card => {
+                    const criteria = card.querySelector('span.text-slate-800').textContent;
+                    const comment = card.querySelector('span.text-slate-500').textContent;
+                    const score = card.querySelector('span.border').textContent.trim();
+                    textToCopy += `• ${criteria}: ${score}\n  รายละเอียด: ${comment}\n\n`;
+                });
+            }
+
+            textToCopy += `--- ข้อเสนอแนะภาพรวม ---\n${overallComment}`;
+
+            const tempTextarea = document.createElement('textarea');
+            tempTextarea.value = textToCopy;
+            document.body.appendChild(tempTextarea);
+            tempTextarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempTextarea);
+
+            alertCustom("คัดลอกผลลัพธ์ไปยังคลิปบอร์ดแล้ว เรียบร้อยครับ!");
+        }
+
+        // Reset completely
+        function resetAll() {
+            document.getElementById('rubricInput').value = "";
+            document.getElementById('fileInput').value = '';
+            document.getElementById('docLinkInput').value = '';
+            
+            attachedFiles = [];
+            renderAttachedFileList();
+
+            document.getElementById('resultPanel').classList.add('hidden');
+            document.getElementById('resultPlaceholder').classList.remove('hidden');
+            document.getElementById('resultLoading').classList.add('hidden');
+
+            document.getElementById('copyBtn').disabled = true;
+            document.getElementById('printBtn').disabled = true;
+        }
+    </script>
+</body>
+</html>
