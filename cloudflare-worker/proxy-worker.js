@@ -6,7 +6,7 @@ addEventListener('fetch', event => {
 // NOTE: This Worker allows requests only from ALLOWED_ORIGINS. If you need stricter
 // security, add token-based checks or restrict allowed target hosts.
 
-const ALLOWED_ORIGINS = ['https://koki-assawin.github.io'] // ปรับเป็นโดเมนของคุณ หรือ ใช้ ['*']
+const ALLOWED_ORIGINS = ['https://koki-assawin.github.io'] // ปรับเป็นโดเมนของคุณ (ไม่ใส่ path)
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024 // 5 MB limit to avoid huge payloads
 
 async function handle(request) {
@@ -27,6 +27,7 @@ async function handle(request) {
     const resp = await fetch(target, {
       method: 'GET',
       headers: {
+        // optional: forward some headers; avoid forwarding credentials
         'User-Agent': 'GradelyProxy/1.0'
       }
     })
