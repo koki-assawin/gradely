@@ -1,20 +1,22 @@
-// Helper client function to call the Cloudflare Worker proxy
-// PROXY_BASE has been set to the Worker URL deployed in your Cloudflare account
+// Client helper configured to send an authorization token to the proxy
 
-const PROXY_BASE = 'https://dawn-fire-b401.koki-assawin.workers.dev' // <- updated to your deployed Worker URL
+const PROXY_BASE = 'https://dawn-fire-b401.koki-assawin.workers.dev' // Update to your Worker URL
+const PROXY_TOKEN = '<PUT-YOUR-PROXY-TOKEN-HERE>' // Replace with the token you configured in Cloudflare
 
 /**
- * Fetch plaintext contents of a remotely hosted document (e.g. Google Docs export)
- * via the Cloudflare Worker proxy to avoid CORS failures.
- *
- * @param {string} remoteUrl - The full URL to fetch (already public-export URL)
- * @returns {Promise<string>} - The plaintext body
+ * Fetch plaintext contents of a remotely hosted document via the Cloudflare Worker proxy
  */
 async function fetchKeyPlaintext(remoteUrl) {
   if (!remoteUrl) throw new Error('Missing remoteUrl')
   try {
     const proxyUrl = `${PROXY_BASE}?url=${encodeURIComponent(remoteUrl)}`
-    const res = await fetch(proxyUrl, { method: 'GET', credentials: 'omit' })
+    const res = await fetch(proxyUrl, {
+      method: 'GET',
+      credentials: 'omit',
+      headers: {
+        'x-proxy-token': PROXY_TOKEN
+      }
+    })
     if (!res.ok) {
       const text = await res.text().catch(() => '')
       throw new Error(`Proxy error ${res.status}: ${text}`)
@@ -26,7 +28,3 @@ async function fetchKeyPlaintext(remoteUrl) {
     throw err
   }
 }
-
-// Example of usage inside your existing flow:
-// const plaintext = await fetchKeyPlaintext('https://docs.google.com/document/d/ID/export?format=txt')
-// then parse plaintext to extract API key or doc content as needed

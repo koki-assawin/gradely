@@ -1,28 +1,17 @@
-Title: Add Cloudflare Worker proxy and client helper (production settings)
+Add token-based auth to Cloudflare Worker and update client to send token
 
-This pull request merges the cloudflare proxy and client helper into the main branch with production-safe defaults.
+This branch adds a simple token check to the Worker. The Worker expects a Secret Text binding named `PROXY_TOKEN` to be configured in Cloudflare. The client must send the header `x-proxy-token` with the token value.
 
-What this PR does:
-- Adds a Cloudflare Worker script that acts as a CORS-safe proxy for fetching remote resources (e.g., Google Docs export links).
-  - Restricts Access-Control-Allow-Origin to the production origin (koki-assawin.github.io) to avoid open-proxy behavior.
-  - Applies a 5 MB response size limit and basic URL validation.
-- Adds a client helper (fetchKeyPlaintext) configured to call the deployed Worker URL.
-- Includes documentation (PROXY_SETUP.md) with steps to deploy and test the Worker.
+Files added/updated:
+- cloudflare-worker/proxy-worker.js (token auth + host whitelist + CORS headers updated)
+- client/gradely-proxy-client.js (sends x-proxy-token header)
+- docs/PROXY_SETUP.md updated with steps to add Secret in Cloudflare
 
-Files changed:
-- cloudflare-worker/proxy-worker.js (new/updated)
-- client/gradely-proxy-client.js (new/updated)
-- docs/PROXY_SETUP.md (new/updated)
+Testing steps (web-only):
+1. Merge this branch into main
+2. In Cloudflare dashboard, for the Worker service, add a binding (Secret text) named `PROXY_TOKEN` and set its value to a random secret string (e.g. generated via a password manager)
+3. Deploy the Worker with the updated code
+4. Set PROXY_TOKEN in client/gradely-proxy-client.js (or serve the token from a secure server if possible). Then call the proxy:
+   https://<your-worker>.workers.dev/?url=<ENCODED_GOOGLE_EXPORT_URL>
 
-Testing steps:
-1. Deploy the Worker via Cloudflare Dashboard or wrangler.
-2. Ensure the Worker URL is set as PROXY_BASE in client/gradely-proxy-client.js.
-3. Make a test request to:
-   <worker_url>?url=<encoded_google_export_url>
-   Expect: 200 response and Access-Control-Allow-Origin header set to https://koki-assawin.github.io
-
-Risks & mitigations:
-- Still allows arbitrary HTTP(S) targets by default. If you need stricter restrictions, consider adding a target-host whitelist or a token-check. The current setup protects origin exposure but not target abuse.
-
-Author: koki-assawin
-
+Note: Storing the token in client-side code is insecure; for production, provide the token via a secure backend or short-lived tokens.
