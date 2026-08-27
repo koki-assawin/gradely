@@ -3,10 +3,10 @@ addEventListener('fetch', event => {
 })
 
 // Simple CORS-safe proxy for fetching remote resources (e.g., Google Docs export URLs)
-// NOTE: This Worker allows requests only from ALLOWED_ORIGINS. If you need stricter
-// security, add token-based checks or restrict allowed target hosts.
+// This version adds a target-host whitelist so the Worker only fetches from allowed hosts.
 
-const ALLOWED_ORIGINS = ['https://koki-assawin.github.io'] // ปรับเป็นโดเมนของคุณ (ไม่ใส่ path)
+const ALLOWED_ORIGINS = ['https://koki-assawin.github.io'] // production origin (no path)
+const ALLOWED_TARGET_HOSTS = ['docs.google.com'] // only allow fetching from these hosts
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024 // 5 MB limit to avoid huge payloads
 
 async function handle(request) {
@@ -21,6 +21,17 @@ async function handle(request) {
   // Basic validation: only allow http(s) targets
   if (!/^https?:\/\//i.test(target)) {
     return new Response('Invalid url', { status: 400, headers: corsHeaders(request) })
+  }
+
+  // Check target host whitelist
+  let parsedTarget
+  try {
+    parsedTarget = new URL(target)
+  } catch (err) {
+    return new Response('Invalid target URL', { status: 400, headers: corsHeaders(request) })
+  }
+  if (!ALLOWED_TARGET_HOSTS.includes(parsedTarget.hostname)) {
+    return new Response('Target host not allowed', { status: 403, headers: corsHeaders(request) })
   }
 
   try {
