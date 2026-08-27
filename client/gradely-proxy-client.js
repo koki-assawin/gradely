@@ -1,7 +1,7 @@
 // Helper client function to call the Cloudflare Worker proxy
-// Usage: replace the existing fetchKeyPlaintext implementation with this
+// PROXY_BASE has been set to the Worker URL deployed in your Cloudflare account
 
-const PROXY_BASE = 'https://your-worker-subdomain.workers.dev' // <-- CHANGE THIS to your deployed Worker URL
+const PROXY_BASE = 'https://dawn-fire-b401.koki-assawin.workers.dev' // <- updated to your deployed Worker URL
 
 /**
  * Fetch plaintext contents of a remotely hosted document (e.g. Google Docs export)
